@@ -1,0 +1,12 @@
+[submodule "external/IsaacSimPython"]
+	path = external/IsaacSimPython
+	url = https://github.com/UnitreeG/IsaacSimPython.git
+[submodule "external/IsaacSim"]
+	path = external/IsaacSim
+	url = https://github.com/isaac-sim/IsaacSim.git
+[submodule "external/IsaacLab"]
+	path = external/IsaacLab
+	url = https://github.com/isaac-sim/IsaacLab.git
+[submodule "external/g1_23dof_locomotion_isaac"]
+	path = external/g1_23dof_locomotion_isaac
+	url = https://github.com/jloganolson/g1_23dof_locomotion_isaac.git
