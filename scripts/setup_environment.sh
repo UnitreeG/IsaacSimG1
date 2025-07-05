@@ -187,13 +187,100 @@ install_g1_project() {
     
     # Install additional dependencies
     print_info "Installing additional dependencies..."
-    pip install rsl-rl==2.0.2 rl-games==1.6.2 ray[rllib]==2.6.3 wandb tensorboard matplotlib
+    pip install rsl-rl-lib==2.3.1 rl-games==1.6.1 ray[rllib]==2.6.3 wandb tensorboard matplotlib
     
     # Install MuJoCo for sim2sim deployment
     print_info "Installing MuJoCo..."
     pip install mujoco dm_control
     
     print_success "G1 locomotion project installed successfully"
+}
+
+# Setup WebRTC for livestreaming (optional)
+setup_webrtc() {
+    print_header "Setting up WebRTC for Livestreaming (Optional)"
+    
+    print_info "WebRTC allows real-time video monitoring of Isaac Sim training sessions."
+    print_info "This is useful for visual debugging and monitoring robot behavior."
+    
+    # Check if user wants to install WebRTC dependencies
+    print_warning "WebRTC setup requires system packages and may need sudo privileges."
+    read -p "Do you want to install WebRTC dependencies? (y/N): " -n 1 -r
+    echo
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        print_info "Installing WebRTC system dependencies..."
+        
+        # Install required system libraries
+        if command -v apt-get &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y libxt6 libxrandr2 libglu1-mesa libgl1-mesa-glx
+            print_success "WebRTC system dependencies installed"
+        elif command -v yum &> /dev/null; then
+            sudo yum install -y libXt libXrandr2 mesa-libGLU
+            print_success "WebRTC system dependencies installed"
+        else
+            print_warning "Package manager not recognized. Please install manually:"
+            print_info "  Required packages: libXt6, libXrandr2, libGLU1-mesa"
+        fi
+        
+        # Create WebRTC configuration note
+        print_info "Creating WebRTC configuration notes..."
+        cat > ${PROJECT_ROOT}/WEBRTC_SETUP.md << EOF
+# WebRTC Livestreaming Setup
+
+## Overview
+WebRTC allows real-time video streaming of Isaac Sim training sessions for monitoring and debugging.
+
+## Requirements
+- System packages: libXt6, libXrandr2, libGLU1-mesa
+- Isaac Sim WebRTC extensions (automatically loaded)
+- Network ports: 8211 (HTTP), 49100 (UDP)
+
+## Usage
+
+### Training with WebRTC
+\`\`\`bash
+# Start training with WebRTC livestreaming
+g1_train --task=Loco --livestream=2
+
+# Or using environment variables
+export LIVESTREAM=2
+g1_train --task=Loco
+\`\`\`
+
+### Playing with WebRTC
+\`\`\`bash
+# Play trained policy with WebRTC visualization
+g1_play --task=Loco --checkpoint=/path/to/model.pt --livestream=2 --num_envs=16
+\`\`\`
+
+### Accessing WebRTC Stream
+- Open browser to: http://localhost:8211/streaming/webrtc-demo/
+- Or use the Isaac Sim Streaming Client application
+
+## Environment Variables
+- LIVESTREAM=2: Enable WebRTC streaming
+- OMNI_WEBRTC_PORT_HTTP=8211: HTTP port for WebRTC
+- OMNI_WEBRTC_PORT_UDP=49100: UDP port for WebRTC
+
+## Troubleshooting
+- If segmentation fault occurs, ensure all system libraries are installed
+- Check firewall settings for ports 8211 and 49100
+- For headless servers, WebRTC may conflict with display requirements
+
+## Notes
+- WebRTC streaming may impact training performance
+- Use fewer environments (--num_envs=4-16) for better streaming quality
+- Headless training is recommended for production, WebRTC for debugging
+EOF
+        
+        print_success "WebRTC setup completed!"
+        print_info "WebRTC configuration notes saved to: ${PROJECT_ROOT}/WEBRTC_SETUP.md"
+    else
+        print_info "Skipping WebRTC setup. You can run this later by calling:"
+        print_info "  setup_webrtc"
+    fi
 }
 
 # Setup environment variables and aliases
@@ -227,6 +314,10 @@ alias g1_train="cd ${G1_PROJECT_PATH} && python scripts/rsl_rl/train.py"
 alias g1_play="cd ${G1_PROJECT_PATH} && python scripts/rsl_rl/play.py"
 alias g1_deploy="cd ${G1_PROJECT_PATH}/deployment && python deploy_sim.py"
 
+# WebRTC streaming aliases
+alias g1_train_webrtc="cd ${G1_PROJECT_PATH} && python scripts/rsl_rl/train.py --livestream=2"
+alias g1_play_webrtc="cd ${G1_PROJECT_PATH} && python scripts/rsl_rl/play.py --livestream=2"
+
 # Set resource name for Isaac Sim
 export RESOURCE_NAME="IsaacSim"
 
@@ -235,10 +326,12 @@ export PYTHONPATH="${G1_PROJECT_PATH}:${ISAACLAB_PATH}/source:${PYTHONPATH}"
 
 echo "Isaac Lab G1 environment activated!"
 echo "Available aliases:"
-echo "  isaaclab  - Run Isaac Lab"
-echo "  g1_train  - Train G1 locomotion"
-echo "  g1_play   - Play trained G1 policy"
-echo "  g1_deploy - Deploy to MuJoCo"
+echo "  isaaclab        - Run Isaac Lab"
+echo "  g1_train        - Train G1 locomotion"
+echo "  g1_play         - Play trained G1 policy"
+echo "  g1_deploy       - Deploy to MuJoCo"
+echo "  g1_train_webrtc - Train with WebRTC livestreaming"
+echo "  g1_play_webrtc  - Play with WebRTC livestreaming"
 EOF
 
     # Create deactivation script
@@ -257,6 +350,8 @@ unalias isaaclab 2>/dev/null || true
 unalias g1_train 2>/dev/null || true
 unalias g1_play 2>/dev/null || true
 unalias g1_deploy 2>/dev/null || true
+unalias g1_train_webrtc 2>/dev/null || true
+unalias g1_play_webrtc 2>/dev/null || true
 
 echo "Isaac Lab G1 environment deactivated!"
 EOF
@@ -365,6 +460,9 @@ main() {
         verify_installation "$env_name"
     fi
     
+    # Setup WebRTC
+    setup_webrtc
+    
     print_header "Setup Complete!"
     print_success "Isaac Lab G1 environment setup completed successfully!"
     print_info "To activate the environment, run:"
@@ -378,6 +476,11 @@ main() {
     print_info ""
     print_info "To deploy to MuJoCo:"
     print_info "  g1_deploy"
+    print_info ""
+    print_info "For WebRTC livestreaming (if enabled):"
+    print_info "  g1_train_webrtc --task=Loco --num_envs=16"
+    print_info "  g1_play_webrtc --task=Loco --checkpoint=/path/to/model.pt"
+    print_info "  Then open: http://localhost:8211/streaming/webrtc-demo/"
 }
 
 # Show help
